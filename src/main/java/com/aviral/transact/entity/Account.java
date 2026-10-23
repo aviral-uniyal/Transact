@@ -32,4 +32,7 @@ public class Account {
     public String getDisplayName() { return displayName; }
     public BigDecimal getBalance() { return balance; }
     public Instant getCreatedAt() { return createdAt; }
+
+    public void debit(BigDecimal amount) { balance = balance.subtract(amount); }
+    public void credit(BigDecimal amount) { balance = balance.add(amount); }
 }

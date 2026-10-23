@@ -1,6 +1,7 @@
 package com.aviral.transact.controller;
 
 import com.aviral.transact.service.AccountNotFoundException;
+import com.aviral.transact.service.TransferException;
 import org.springframework.http.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
@@ -9,6 +10,11 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(TransferException.class)
+    ResponseEntity<Map<String, String>> transferError(TransferException exception) {
+        return ResponseEntity.status(exception.getStatus()).body(Map.of("error", exception.getMessage()));
+    }
+
     @ExceptionHandler(AccountNotFoundException.class)
     ResponseEntity<Map<String, String>> notFound(AccountNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", exception.getMessage()));
