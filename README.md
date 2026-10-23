@@ -1,6 +1,6 @@
 # Transact
 
-Transact is a small Spring Boot transaction system with PostgreSQL-backed demo accounts and atomic fund transfers. It is a learning project, not a payment gateway or banking integration.
+Transact is a small Spring Boot transaction system with PostgreSQL-backed demo accounts, atomic fund transfers, and a browser dashboard. It is a learning project using virtual funds, not a payment gateway or banking integration.
 
 ## Stack
 
@@ -12,6 +12,7 @@ Java 21 target, Spring Boot 4.0.9, Maven, Spring Web MVC, Spring Data JPA, Bean 
 - List accounts and retrieve an account by ID.
 - Validate inputs and return JSON errors for invalid requests and missing accounts.
 - Transfer funds between accounts, with idempotent retries and transfer history.
+- Use the responsive dashboard to create accounts, move virtual funds, and view balances and history.
 
 Money uses `BigDecimal` and a PostgreSQL `numeric(19,2)` column. Hibernate creates or updates the development schema on startup (`ddl-auto=update`). This is intended for local development; use versioned migrations before production deployment.
 
@@ -30,6 +31,8 @@ $env:DB_PASSWORD = '<your local password>'
 On macOS/Linux, use `./mvnw`. `DB_URL` and `DB_USERNAME` default to the local values shown; `DB_PASSWORD` has no default password. Keep credentials outside Git.
 
 Alternatively, put `spring.datasource.username` and `spring.datasource.password` in the Git-ignored `application-local.properties`, then run the packaged app with `--spring.config.additional-location=optional:file:./application-local.properties`. Add `--server.port=18080` if port 8080 is occupied.
+
+Open `http://localhost:8080/` for the dashboard, or `http://localhost:18080/` when using port 18080. The HTML, CSS, and vanilla JavaScript are served by Spring Boot from the same origin as the API; no frontend build step is needed. The dashboard has account overview and creation, a transfer form, and recent transfer history. If a transfer response is uncertain, the page keeps its original request and idempotency key for an explicit safe retry. Discarding that pending attempt requires checking balances and history because the transfer may already have completed.
 
 ## API
 

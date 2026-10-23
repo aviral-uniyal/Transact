@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f8fc">
+  <title>Transact · Payment Transaction Dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">T</span><span>Transact</span></div>
+      <span class="environment"><span class="environment-dot" aria-hidden="true"></span> Virtual funds simulator</span>
+    </header>
+
+    <main>
+      <div class="intro">
+        <div>
+          <p class="eyebrow">PAYMENT TRANSACTION DASHBOARD</p>
+          <h1>Move virtual funds with confidence.</h1>
+          <p class="intro-copy">Create demo accounts, make transfers, and review activity in one place. No real money is processed.</p>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <section class="panel accounts-panel" aria-labelledby="accounts-heading">
+          <div class="panel-heading"><div><p class="section-label">OVERVIEW</p><h2 id="accounts-heading">Accounts</h2></div><button class="button button-quiet" id="refresh-accounts" type="button">Refresh</button></div>
+          <p class="panel-description">Current balances across your demo accounts.</p>
+          <p id="accounts-state" class="state" role="status">Loading accounts…</p>
+          <div id="accounts-list" class="account-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel create-panel" aria-labelledby="create-heading">
+          <div class="panel-heading"><div><p class="section-label">GET STARTED</p><h2 id="create-heading">Create account</h2></div></div>
+          <p class="panel-description">Add a demo account with an initial virtual balance.</p>
+          <form id="create-form" class="form-stack">
+            <label for="display-name">Display name</label>
+            <input id="display-name" name="displayName" type="text" maxlength="100" placeholder="e.g. Operating account" required>
+            <label for="initial-balance">Initial virtual balance</label>
+            <div class="input-suffix"><input id="initial-balance" name="initialBalance" type="number" min="0" step="0.01" value="0.00" required><span>units</span></div>
+            <button id="create-submit" class="button button-primary" type="submit">Create account</button>
+          </form>
+          <p id="create-feedback" class="feedback" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="panel transfer-panel" aria-labelledby="transfer-heading">
+          <div class="panel-heading"><div><p class="section-label">MOVE FUNDS</p><h2 id="transfer-heading">New transfer</h2></div></div>
+          <p class="panel-description">Transfers between demo accounts are recorded as virtual transactions.</p>
+          <form id="transfer-form" class="form-stack">
+            <div class="form-row">
+              <div><label for="from-account">From account</label><select id="from-account" required></select></div>
+              <div><label for="to-account">To account</label><select id="to-account" required></select></div>
+            </div>
+            <p id="available-balance" class="balance-hint">Select a sender to see its balance.</p>
+            <label for="transfer-amount">Amount</label>
+            <div class="input-suffix"><input id="transfer-amount" type="number" min="0.01" step="0.01" placeholder="0.00" required><span>units</span></div>
+            <button id="transfer-submit" class="button button-primary" type="submit">Make transfer</button>
+          </form>
+          <p id="transfer-feedback" class="feedback" role="status" aria-live="polite"></p>
+          <div id="pending-attempt" class="pending" hidden>
+            <strong>Transfer outcome is uncertain</strong>
+            <p>The connection ended before confirmation. Retry this exact request safely, or discard the pending attempt after checking balances and history. A discarded transfer may still have completed.</p>
+            <div class="button-row"><button id="retry-transfer" class="button button-primary" type="button">Retry same transfer</button><button id="discard-transfer" class="button button-quiet" type="button">Discard attempt</button></div>
+          </div>
+        </section>
+
+        <section class="panel history-panel" aria-labelledby="history-heading">
+          <div class="panel-heading"><div><p class="section-label">ACTIVITY</p><h2 id="history-heading">Transfer history</h2></div><button class="button button-quiet" id="refresh-history" type="button">Refresh</button></div>
+          <p class="panel-description">The 100 most recent completed transfers.</p>
+          <p id="history-state" class="state" role="status">Loading transfers…</p>
+          <div class="table-scroll"><table id="history-table" hidden><thead><tr><th>ID</th><th>From</th><th>To</th><th>Amount</th><th>Status</th><th>When</th></tr></thead><tbody id="history-body"></tbody></table></div>
+        </section>
+      </div>
+    </main>
+    <footer>Transact · Virtual funds only</footer>
+  </div>
+</body>
+</html>
