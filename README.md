@@ -1,72 +1,180 @@
 # Transact
 
-Transact is a small Spring Boot transaction system with PostgreSQL-backed demo accounts, atomic fund transfers, and a browser dashboard. It is a learning project using virtual funds, not a payment gateway or banking integration.
+Transact is a concurrent virtual payment transaction processing system built with Java, Spring Boot, and PostgreSQL. It demonstrates reliable fund transfers, database transaction boundaries, concurrency-safe balance updates, idempotent request handling, and a lightweight web dashboard.
 
-## Stack
+> Transact uses demo accounts and virtual funds. It does not process real payments or connect to banks or payment networks.
 
-Java 21 target, Spring Boot 4.0.9, Maven, Spring Web MVC, Spring Data JPA, Bean Validation, PostgreSQL, and JUnit 5.
+## Overview
 
-## Implemented
+The project focuses on the correctness problems behind moving money-like values between accounts. A transfer must debit one account, credit another, and save its history record as one atomic operation. Concurrent requests must not lose updates or create negative balances, and a retried request must not move funds twice.
 
-- Create a demo account with a nonnegative starting balance.
-- List accounts and retrieve an account by ID.
-- Validate inputs and return JSON errors for invalid requests and missing accounts.
-- Transfer funds between accounts, with idempotent retries and transfer history.
-- Use the responsive dashboard to create accounts, move virtual funds, and view balances and history.
+Transact provides a browser dashboard for demonstrations and a REST API for direct testing. PostgreSQL is the source of truth for balances and transfer history.
 
-Money uses `BigDecimal` and a PostgreSQL `numeric(19,2)` column. Hibernate creates or updates the development schema on startup (`ddl-auto=update`). This is intended for local development; use versioned migrations before production deployment.
+## Features
 
-## Run locally
+- Create and inspect demo accounts with decimal balances.
+- Transfer virtual funds atomically between distinct accounts.
+- Reject invalid amounts, missing accounts, and insufficient balances.
+- Lock account rows in deterministic order for concurrent transfers.
+- Replay identical idempotent requests without moving funds again.
+- Reject reuse of an idempotency key with a different payload.
+- Browse the 100 most recent completed transfers.
+- Use a responsive HTML, CSS, and vanilla JavaScript dashboard.
+- Retry uncertain dashboard submissions with the original request and key.
+- Return concise JSON validation and error responses.
 
-Install a Java 21 JDK and PostgreSQL. Maven is supplied by the wrapper. Create a local database named `transact` using your PostgreSQL administration tool or `CREATE DATABASE transact;`. Set the following environment variables for the database user you configured:
+## Technology Stack
 
-```powershell
-$env:DB_URL = 'jdbc:postgresql://localhost:5432/transact'
-$env:DB_USERNAME = 'postgres'
-$env:DB_PASSWORD = '<your local password>'
-.\mvnw.cmd test
-.\mvnw.cmd spring-boot:run
+- Java 21 target; locally verified with JDK 23
+- Spring Boot 4.0.9
+- Spring Web MVC, Spring Data JPA, and Bean Validation
+- PostgreSQL 18 and the PostgreSQL JDBC driver
+- Maven Wrapper
+- JUnit 5 and Mockito
+- HTML, CSS, and vanilla JavaScript
+
+Money is represented with `BigDecimal` in Java and `NUMERIC(19,2)` in PostgreSQL.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    UI[Web Dashboard] --> API[REST Controllers]
+    API --> SVC[Service Layer]
+    SVC --> JPA[Spring Data JPA]
+    JPA --> DB[(PostgreSQL)]
 ```
 
-On macOS/Linux, use `./mvnw`. `DB_URL` and `DB_USERNAME` default to the local values shown; `DB_PASSWORD` has no default password. Keep credentials outside Git.
+- **Web Dashboard:** calls the same-origin account and transfer APIs and renders API data safely with DOM APIs.
+- **REST Controllers:** validate request DTOs and map results to HTTP responses.
+- **Service Layer:** owns transaction boundaries, transfer rules, idempotency, and balance changes.
+- **Spring Data JPA:** persists entities and obtains pessimistic database locks.
+- **PostgreSQL:** stores accounts and completed transfers and enforces idempotency-key uniqueness.
 
-Alternatively, put `spring.datasource.username` and `spring.datasource.password` in the Git-ignored `application-local.properties`, then run the packaged app with `--spring.config.additional-location=optional:file:./application-local.properties`. Add `--server.port=18080` if port 8080 is occupied.
+## Transaction Processing
 
-Open `http://localhost:8080/` for the dashboard, or `http://localhost:18080/` when using port 18080. The HTML, CSS, and vanilla JavaScript are served by Spring Boot from the same origin as the API; no frontend build step is needed. The dashboard has account overview and creation, a transfer form, and recent transfer history. If a transfer response is uncertain, the page keeps its original request and idempotency key for an explicit safe retry. Discarding that pending attempt requires checking balances and history because the transfer may already have completed.
+`POST /api/transfers` validates the account IDs, positive decimal amount, and `Idempotency-Key`. The service then obtains a PostgreSQL transaction-scoped advisory lock derived from the key. Requests using the same key are serialized before the existing-transfer lookup.
 
-## API
+An identical completed request returns the original transfer. A different payload with the same key returns `409 Conflict`. A database unique constraint provides a second enforcement layer.
+
+For a new transfer, both account rows are locked with pessimistic write locks. Locks are always acquired in ascending account-ID order to reduce deadlock risk. The sender balance is checked only after locking. Debit, credit, and transfer-history insertion run inside one `@Transactional` method, so an exception rolls back the entire operation. Failed transactions do not consume the idempotency key.
+
+This strategy has been exercised with focused PostgreSQL concurrency tests; it is not a formal verification of every possible concurrency scenario.
+
+## API Endpoints
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/accounts` | Create a demo account |
+| `GET` | `/api/accounts` | List accounts and balances |
+| `GET` | `/api/accounts/{id}` | Get one account |
+| `POST` | `/api/transfers` | Transfer virtual funds |
+| `GET` | `/api/transfers` | List recent completed transfers |
+| `GET` | `/api/transfers/{id}` | Get one transfer |
+
+Create an account:
 
 ```http
 POST /api/accounts
 Content-Type: application/json
 
-{"displayName":"Aviral","initialBalance":100.00}
+{"displayName":"Demo Wallet","initialBalance":500.00}
 ```
 
-Returns `201 Created`, a `Location` header, and an account with `id`, `displayName`, `balance`, and `createdAt`. Invalid input returns `400` with an `error` message.
-
-`GET /api/accounts` returns an array of accounts. `GET /api/accounts/1` returns one account or `404` with an `error` message.
-
-## Transfers
+Create a transfer:
 
 ```http
 POST /api/transfers
-Idempotency-Key: order-123
 Content-Type: application/json
+Idempotency-Key: demo-transfer-001
 
-{"fromAccountId":1,"toAccountId":2,"amount":25.00}
+{"fromAccountId":1,"toAccountId":2,"amount":125.00}
 ```
 
-A new transfer returns `201 Created` and a `Location` header. Repeating the same key with the same accounts and equivalent amount returns the original transfer with `200 OK`; it does not move funds again. Reusing the key for a different transfer returns `409 Conflict`. Keys must have 1–128 ASCII letters, digits, dots, underscores, colons, or hyphens, beginning with a letter or digit. Whitespace around a key is trimmed. Amounts must be positive with at most two decimal places.
+A new transfer returns `201 Created`. An identical replay returns the original transfer with `200 OK`. Invalid requests return `400`, missing resources return `404`, and insufficient funds or a conflicting key return `409`.
 
-`GET /api/transfers` returns up to 100 completed transfers, newest first. `GET /api/transfers/{id}` returns one transfer or `404`.
+## Getting Started
 
-Invalid input returns `400`; insufficient funds and conflicting keys return `409`; missing accounts or transfers return `404`. Error responses have an `error` field. Only completed transfers are stored.
+### Prerequisites
 
-Each transfer debits, credits, and saves its history record in one database transaction. PostgreSQL transaction-scoped advisory locks serialize requests with the same key before checking for an existing transfer; the database also has a unique key constraint. The two account rows are locked for writing in ascending ID order until commit, preventing lost updates and negative balances. Failed transactions roll back and do not consume their key.
+- Java 21 or a newer JDK capable of targeting Java 21
+- PostgreSQL
+- Git
 
-To run the focused PostgreSQL concurrency tests locally with the ignored configuration file, use PowerShell:
+Maven does not need to be installed globally because the repository includes the Maven Wrapper.
+
+### Database and configuration
+
+Create a local PostgreSQL database named `transact`:
+
+```sql
+CREATE DATABASE transact;
+```
+
+Supply credentials through environment variables:
+
+```powershell
+$env:DB_URL = 'jdbc:postgresql://localhost:5432/transact'
+$env:DB_USERNAME = 'postgres'
+$env:DB_PASSWORD = '<your local password>'
+```
+
+The URL and username have local defaults; the password does not. As an alternative, create the Git-ignored `application-local.properties` in the repository root:
+
+```properties
+spring.datasource.username=postgres
+spring.datasource.password=<your local password>
+```
+
+No Spring profile activation is required. When using this file, explicitly add it as a configuration location when starting the application. Credentials and local configuration must remain outside Git.
+
+For local development, Hibernate updates the schema through `spring.jpa.hibernate.ddl-auto=update`. A production system should use versioned database migrations instead.
+
+### Build and run
+
+On Windows PowerShell:
+
+```powershell
+.\mvnw.cmd clean package
+java -jar target/transact-0.0.1-SNAPSHOT.jar --spring.config.additional-location=optional:file:./application-local.properties
+```
+
+With environment variables, run `./mvnw spring-boot:run` on macOS/Linux or `.\mvnw.cmd spring-boot:run` on Windows.
+
+Spring Boot uses port 8080 by default. Port 18080 was used during local verification because 8080 was occupied:
+
+```powershell
+java -jar target/transact-0.0.1-SNAPSHOT.jar --spring.config.additional-location=optional:file:./application-local.properties --server.port=18080
+```
+
+Open `http://localhost:8080/`, or `http://localhost:18080/` when using the alternate port.
+
+## Testing
+
+Run the fast unit tests:
+
+```powershell
+.\mvnw.cmd test
+```
+
+`AccountServiceTests` checks account creation, missing-account behavior, and request validation without a database.
+
+Run the real PostgreSQL integration and concurrency tests with the ignored local configuration file:
 
 ```powershell
 .\mvnw.cmd '-Dtransact.integration=true' '-Dspring.config.additional-location=optional:file:./application-local.properties' test
 ```
+
+`TransferIntegrationTests` verifies successful balance updates, rollback after insufficient funds, same-account rejection, history, idempotent replay and conflict behavior, failed-key reuse, concurrent shared-account transfers, and concurrent same-key requests. Request DTO constraints cover positive amounts and valid account IDs at the REST boundary.
+
+## Screenshots
+
+The dashboard is available at the application root after startup. A repository screenshot has not been added; capture the dashboard with representative demo data and add it under `docs/` if a static preview is desired later.
+
+## Demo
+
+See [DEMO.md](DEMO.md) for a focused 3-5 minute interview walkthrough.
+
+## Project Scope
+
+Transact is an educational virtual payment simulator. It has no authentication, real banking integration, card processing, external payment network, PCI DSS claim, or production security claim. The current schema-update strategy and local credential setup are intended for development and portfolio demonstration.
