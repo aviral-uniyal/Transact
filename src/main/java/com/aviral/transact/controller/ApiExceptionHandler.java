@@ -6,6 +6,7 @@ import org.springframework.http.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import java.util.Map;
 
 @RestControllerAdvice
@@ -31,5 +32,10 @@ public class ApiExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<Map<String, String>> malformed() {
         return ResponseEntity.badRequest().body(Map.of("error", "Invalid JSON request"));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<Map<String, String>> invalidParameter(MethodArgumentTypeMismatchException exception) {
+        return ResponseEntity.badRequest().body(Map.of("error", "Invalid query parameter: " + exception.getName()));
     }
 }

@@ -19,6 +19,9 @@ Transact provides a browser dashboard for demonstrations and a REST API for dire
 - Replay identical idempotent requests without moving funds again.
 - Reject reuse of an idempotency key with a different payload.
 - Browse the 100 most recent completed transfers.
+- Search transfers with combinable filters and bounded pagination.
+- Read an account statement with incoming and outgoing transfers.
+- Inspect aggregate account and transfer totals and UTC daily transfer volume.
 - Use a responsive HTML, CSS, and vanilla JavaScript dashboard.
 - Retry uncertain dashboard submissions with the original request and key.
 - Return concise JSON validation and error responses.
@@ -68,9 +71,12 @@ This strategy has been exercised with focused PostgreSQL concurrency tests; it i
 | `POST` | `/api/accounts` | Create a demo account |
 | `GET` | `/api/accounts` | List accounts and balances |
 | `GET` | `/api/accounts/{id}` | Get one account |
+| `GET` | `/api/accounts/{id}/statement` | Get an account's paged transfer statement |
 | `POST` | `/api/transfers` | Transfer virtual funds |
-| `GET` | `/api/transfers` | List recent completed transfers |
+| `GET` | `/api/transfers` | List recent transfers or search with filters |
 | `GET` | `/api/transfers/{id}` | Get one transfer |
+| `GET` | `/api/analytics/summary` | Get persisted account and completed-transfer totals |
+| `GET` | `/api/analytics/daily-volume` | Get completed transfer volume by UTC day |
 
 Create an account:
 
@@ -92,6 +98,36 @@ Idempotency-Key: demo-transfer-001
 ```
 
 A new transfer returns `201 Created`. An identical replay returns the original transfer with `200 OK`. Invalid requests return `400`, missing resources return `404`, and insufficient funds or a conflicting key return `409`.
+
+### Transfer search and details
+
+The dashboard still calls bare `GET /api/transfers`, which returns an array of the 100 most recent completed transfers. Supplying any search or pagination parameter, or `paged=true`, returns an object with `content`, `page`, `size`, `totalElements`, and `totalPages`. Results sort by `createdAt` descending, then `id` descending.
+
+| Parameter | Meaning |
+| --- | --- |
+| `transactionId` | Exact transfer ID |
+| `fromAccountId` | Sender account ID |
+| `toAccountId` | Receiver account ID |
+| `startDate` | Earliest UTC creation date, inclusive, `YYYY-MM-DD` |
+| `endDate` | Latest UTC creation date, inclusive, `YYYY-MM-DD` |
+| `page` | Zero-based page number; default `0` |
+| `size` | Page size `1`-`100`; default `20` |
+
+Filters can be combined. For example:
+
+```http
+GET /api/transfers?fromAccountId=1&startDate=2026-10-01&endDate=2026-10-31&page=0&size=20
+```
+
+`GET /api/transfers/{id}` continues to return the transfer ID, account IDs, amount, status, and creation timestamp, or `404` if the transfer does not exist. Invalid search IDs, dates, ranges, and page settings return `400`.
+
+### Account statements and analytics
+
+`GET /api/accounts/{id}/statement?page=0&size=20` returns `accountId`, `displayName`, `currentBalance`, and paged `entries`. Each entry contains `transferId`, `createdAt`, `direction` (`DEBIT` or `CREDIT`), `counterpartyAccountId`, `amount`, and `status`. Entries use the same newest-first ordering as transfer search. Unknown accounts return `404`.
+
+`GET /api/analytics/summary` returns `accountCount`, `completedTransferCount`, `totalTransferredAmount`, and `totalAccountBalances`. The transfer amount sums each completed transfer once; account balances are summed separately.
+
+`GET /api/analytics/daily-volume` defaults to the last seven UTC calendar days, including today. Optional `startDate` and `endDate` parameters select an inclusive range of at most 366 days. It returns chronologically ordered entries with `date`, `completedTransferCount`, and `totalAmount`. Days without completed transfers appear with zero values. Aggregation runs in PostgreSQL; the service fills zero-volume dates afterward.
 
 ## Getting Started
 
@@ -166,6 +202,8 @@ Run the real PostgreSQL integration and concurrency tests with the ignored local
 ```
 
 `TransferIntegrationTests` verifies successful balance updates, rollback after insufficient funds, same-account rejection, history, idempotent replay and conflict behavior, failed-key reuse, concurrent shared-account transfers, and concurrent same-key requests. Request DTO constraints cover positive amounts and valid account IDs at the REST boundary.
+
+`ReadApiIntegrationTests` exercises database filtering, pagination, account statement directions, persisted analytics totals, UTC daily volume, and invalid ranges against PostgreSQL. The browser dashboard still uses the original transfer-list response; the new read APIs are backend-only in this milestone.
 
 ## Screenshots
 
