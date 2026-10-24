@@ -18,7 +18,7 @@ Transact provides a browser dashboard for demonstrations and a REST API for dire
 - Lock account rows in deterministic order for concurrent transfers.
 - Replay identical idempotent requests without moving funds again.
 - Reject reuse of an idempotency key with a different payload.
-- Browse the 100 most recent completed transfers.
+- Browse recent transfers and search the full history with pagination.
 - Search transfers with combinable filters and bounded pagination.
 - Read an account statement with incoming and outgoing transfers.
 - Inspect aggregate account and transfer totals and UTC daily transfer volume.
@@ -48,7 +48,7 @@ flowchart LR
     JPA --> DB[(PostgreSQL)]
 ```
 
-- **Web Dashboard:** calls the same-origin account and transfer APIs and renders API data safely with DOM APIs.
+- **Web Dashboard:** calls the same-origin account, transfer, and analytics APIs and renders API data safely with DOM APIs.
 - **REST Controllers:** validate request DTOs and map results to HTTP responses.
 - **Service Layer:** owns transaction boundaries, transfer rules, idempotency, and balance changes.
 - **Spring Data JPA:** persists entities and obtains pessimistic database locks.
@@ -205,9 +205,15 @@ Run the real PostgreSQL integration and concurrency tests with the ignored local
 
 `ReadApiIntegrationTests` exercises database filtering, pagination, account statement directions, persisted analytics totals, UTC daily volume, and invalid ranges against PostgreSQL. The dashboard integrates these read APIs in its Overview, Accounts, and History sections.
 
+These integration tests create persistent demo accounts and transfers in the configured local database; they do not purge existing rows. Use a disposable development database when a clean dataset matters.
+
+## Dashboard
+
+The responsive browser dashboard has four views: Overview shows persisted totals, seven UTC days of transfer volume, and recent transfers; Accounts supports creation and paged CREDIT/DEBIT statements; Transfers submits virtual funds with an idempotency-safe retry for uncertain outcomes; and History offers server-side filters, pagination, and a keyboard-accessible details dialog. The tables scroll within their cards on narrow screens.
+
 ## Screenshots
 
-The dashboard is available at the application root after startup. Its responsive sidebar switches between Overview (persisted analytics, seven-day UTC volume, and recent transfers), Accounts (creation and paged statements), Transfers (idempotency-safe submission and retry), and History (server-side filters, pagination, and transaction details). A repository screenshot has not been added; capture the dashboard with representative demo data and add it under `docs/` if a static preview is desired later.
+The dashboard is available at the application root after startup. No screenshot is committed; capture one with representative non-private demo data if a static preview is desired later.
 
 ## Demo
 

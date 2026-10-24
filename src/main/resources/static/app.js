@@ -188,11 +188,18 @@ async function loadAccounts() {
     updateBalanceHint();
     updateTransferControls();
   } catch {
+    accounts = [];
+    renderAccounts();
+    ['from-account', 'to-account', 'filter-from', 'filter-to'].forEach((id) =>
+      populateSelect(id, '', id.startsWith('filter') ? 'Any account' : 'Select account'));
+    updateBalanceHint();
+    updateTransferControls();
     state('accounts-state', 'Accounts could not be loaded. Try refreshing.', true);
   } finally { $('refresh-accounts').disabled = false; }
 }
 async function loadSummary() {
   state('overview-state', 'Loading overview…');
+  $('metric-grid').hidden = true;
   try {
     const result = await api('/api/analytics/summary');
     $('metric-accounts').textContent = String(result.accountCount);
@@ -205,6 +212,7 @@ async function loadSummary() {
 }
 async function loadActivity() {
   state('activity-state', 'Loading activity…');
+  $('activity-chart').hidden = true;
   try {
     const days = await api('/api/analytics/daily-volume');
     if (!Array.isArray(days)) throw new Error('Invalid activity response');
@@ -235,6 +243,7 @@ async function loadActivity() {
 }
 async function loadRecent() {
   state('recent-state', 'Loading transfers…');
+  $('recent-table').hidden = true;
   try {
     const result = await api('/api/transfers?paged=true&page=0&size=5');
     if (!Array.isArray(result.content)) throw new Error('Invalid transfer response');
@@ -304,6 +313,9 @@ function readFilters() {
 async function loadHistory() {
   $('refresh-history').disabled = true;
   state('history-state', 'Loading transfers…');
+  $('history-table').hidden = true;
+  $('history-pagination').hidden = true;
+  $('history-count').textContent = '';
   const params = new URLSearchParams({paged:'true',page:String(historyPage),size:'10',...historyFilters});
   try {
     const result = await api('/api/transfers?' + params);
