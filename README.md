@@ -101,7 +101,7 @@ A new transfer returns `201 Created`. An identical replay returns the original t
 
 ### Transfer search and details
 
-The dashboard still calls bare `GET /api/transfers`, which returns an array of the 100 most recent completed transfers. Supplying any search or pagination parameter, or `paged=true`, returns an object with `content`, `page`, `size`, `totalElements`, and `totalPages`. Results sort by `createdAt` descending, then `id` descending.
+The dashboard uses `paged=true` for recent transfers and History. Bare `GET /api/transfers` remains backward-compatible and returns an array of the 100 most recent completed transfers. Supplying any search or pagination parameter, or `paged=true`, returns an object with `content`, `page`, `size`, `totalElements`, and `totalPages`. Results sort by `createdAt` descending, then `id` descending.
 
 | Parameter | Meaning |
 | --- | --- |
@@ -203,11 +203,11 @@ Run the real PostgreSQL integration and concurrency tests with the ignored local
 
 `TransferIntegrationTests` verifies successful balance updates, rollback after insufficient funds, same-account rejection, history, idempotent replay and conflict behavior, failed-key reuse, concurrent shared-account transfers, and concurrent same-key requests. Request DTO constraints cover positive amounts and valid account IDs at the REST boundary.
 
-`ReadApiIntegrationTests` exercises database filtering, pagination, account statement directions, persisted analytics totals, UTC daily volume, and invalid ranges against PostgreSQL. The browser dashboard still uses the original transfer-list response; the new read APIs are backend-only in this milestone.
+`ReadApiIntegrationTests` exercises database filtering, pagination, account statement directions, persisted analytics totals, UTC daily volume, and invalid ranges against PostgreSQL. The dashboard integrates these read APIs in its Overview, Accounts, and History sections.
 
 ## Screenshots
 
-The dashboard is available at the application root after startup. A repository screenshot has not been added; capture the dashboard with representative demo data and add it under `docs/` if a static preview is desired later.
+The dashboard is available at the application root after startup. Its responsive sidebar switches between Overview (persisted analytics, seven-day UTC volume, and recent transfers), Accounts (creation and paged statements), Transfers (idempotency-safe submission and retry), and History (server-side filters, pagination, and transaction details). A repository screenshot has not been added; capture the dashboard with representative demo data and add it under `docs/` if a static preview is desired later.
 
 ## Demo
 
